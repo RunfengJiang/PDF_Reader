@@ -28,6 +28,14 @@ const FindState = {
   PENDING: 3,
 };
 
+// The maximum number of matches, with their context, that are collected for
+// the "find results" sidebar in the viewer.
+const FIND_RESULTS_LIMIT = 1000;
+
+// The number of characters, on each side of a match, that are used as context
+// when rendering a match in the "find results" sidebar.
+const FIND_RESULTS_CONTEXT_LENGTH = 60;
+
 const CHARACTERS_TO_NORMALIZE = new Map([
   ["\u2010", "-"], // Hyphen
   ["\u2018", "'"], // Left single quotation mark
@@ -398,6 +406,12 @@ function getOriginalIndex(diffs, pos, len) {
   return [oldStart, oldLen];
 }
 
+// Collapse all the whitespace, including newlines, into single spaces such
+// that the context of a match can be rendered on one line.
+function normalizeWhitespace(text) {
+  return text.replaceAll(/\s+/gu, " ");
+}
+
 /**
  * @typedef {object} PDFFindControllerOptions
  * @property {PDFLinkService} linkService - The navigation/linking service.
@@ -426,6 +440,12 @@ class PDFFindController {
   #copiedPageData = null;
 
   #savedPageData = null;
+
+  /**
+   * Matches, with their context, for each page of the document; used to
+   * render the "find results" sidebar in the viewer.
+   */
+  #pageResults = [];
 
   /**
    * @param {PDFFindControllerOptions} options
@@ -579,6 +599,39 @@ class PDFFindController {
     element.scrollIntoView({ block: "start", inline: "center" });
   }
 
+  /**
+   * Select a specific match, e.g. when the user clicks an entry in the
+   * "find results" sidebar, and scroll it into view.
+   * @param {number} pageIndex - The index of the page containing the match.
+   * @param {number} matchIndex - The index of the match on that page.
+   */
+  selectMatch(pageIndex, matchIndex) {
+    if (!this.#state) {
+      return;
+    }
+    const pageMatches = this._pageMatches[pageIndex];
+    if (!pageMatches || matchIndex < 0 || matchIndex >= pageMatches.length) {
+      return;
+    }
+    const previousPage = this._selected.pageIdx;
+
+    this._selected.pageIdx = pageIndex;
+    this._selected.matchIdx = matchIndex;
+    this._offset.pageIdx = pageIndex;
+    this._offset.matchIdx = matchIndex;
+    this._offset.wrapped = false;
+    this._highlightMatches = true;
+    this._scrollMatches = true;
+
+    // Wipe out the previously selected match, if any.
+    if (previousPage !== -1 && previousPage !== pageIndex) {
+      this.#updatePage(previousPage);
+    }
+    this.#updateUIState(FindState.FOUND);
+    this.#updatePage(pageIndex);
+    this.#updateUIResultsCount();
+  }
+
   #reset() {
     this._highlightMatches = false;
     this._scrollMatches = false;
@@ -600,6 +653,12 @@ class PDFFindController {
     };
     this._extractTextPromises = [];
     this._pageContents = []; // Stores the normalized text for each page.
+    // Stores the *raw*, i.e. non-normalized, text for each page; used to
+    // render the context of the matches in the "find results" sidebar.
+    this._pageRawContents = [];
+    // Stores the positions of the end-of-lines, relative to the text items
+    // of each page; used to compute the line of a match.
+    this._pageEolOffsets = [];
     this._pageDiffs = [];
     this._hasDiacritics = [];
     this._matchesCountTotal = 0;
@@ -781,6 +840,10 @@ class PDFFindController {
       }
     });
 
+    // Collect the matches, with their context, for the results sidebar.
+    this.#pageResults[pageIndex] = this.#buildPageResults(pageIndex);
+    this.#dispatchResults();
+
     // When `highlightAll` is set, ensure that the matches on previously
     // rendered (and still active) pages are correctly highlighted.
     if (this.#state.highlightAll) {
@@ -892,16 +955,28 @@ class PDFFindController {
             return;
           }
           const strBuf = [];
+          const eolOffsets = [];
+          let offset = 0;
 
           for (const textItem of textContent.items) {
             strBuf.push(textItem.str);
+            offset += textItem.str.length;
             if (textItem.hasEOL) {
               strBuf.push("\n");
+              // The offsets are relative to the text items, i.e. *without*
+              // the end-of-line markers, since that's the space the matches
+              // are indexed in.
+              eolOffsets.push(offset);
             }
           }
+          this._pageEolOffsets[i] = eolOffsets;
+          const rawContent = strBuf.join("");
+          // Keep the raw content around, since it's used to render the
+          // context of the matches in the "find results" sidebar.
+          this._pageRawContents[i] = rawContent;
           // Store the normalized page content (text items) as one string.
           [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
-            normalize(strBuf.join(""));
+            normalize(rawContent);
         } catch (ex) {
           if (pdfDoc !== this._pdfDocument) {
             resolve();
@@ -909,6 +984,8 @@ class PDFFindController {
           }
           console.error(`Unable to get text content for page ${i + 1}`, ex);
           // Page error -- assuming no text content.
+          this._pageRawContents[i] = "";
+          this._pageEolOffsets[i] = [];
           [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
             ["", null, false];
         }
@@ -938,6 +1015,127 @@ class PDFFindController {
     });
   }
 
+  /**
+   * @typedef {object} FindResult
+   * @property {number} pageIndex - The index of the page containing the match.
+   * @property {number} pageNumber - The page, i.e. `pageIndex + 1`.
+   * @property {number} matchIndex - The index of the match on that page.
+   * @property {number} line - The (approximate) line, on the page, in which
+   *   the match was found.
+   * @property {string} before - The text immediately preceding the match.
+   * @property {string} match - The matched text.
+   * @property {string} after - The text immediately following the match.
+   */
+
+  /**
+   * Collect the matches of one page, including the text surrounding them,
+   * such that they can be rendered in the "find results" sidebar.
+   * @param {number} pageIndex
+   * @returns {FindResult[]}
+   */
+  #buildPageResults(pageIndex) {
+    const raw = this._pageRawContents[pageIndex] ?? "";
+    const matches = this._pageMatches[pageIndex] || [];
+    const matchesLength = this._pageMatchesLength[pageIndex] || [];
+    const pageNumber = pageIndex + 1;
+    const results = [];
+
+    for (let i = 0, ii = matches.length; i < ii; i++) {
+      const matchPos = matches[i];
+      const matchLen = matchesLength[i];
+      // The matches are indexed relative to the text items, hence map them
+      // to the raw page content (which contains the end-of-lines as well).
+      const rawStart = this.#toRawIndex(pageIndex, matchPos);
+      const rawEnd = this.#toRawIndex(pageIndex, matchPos + matchLen, true);
+      const start = Math.max(0, rawStart - FIND_RESULTS_CONTEXT_LENGTH);
+      const end = Math.min(raw.length, rawEnd + FIND_RESULTS_CONTEXT_LENGTH);
+
+      results.push({
+        pageIndex,
+        pageNumber,
+        matchIndex: i,
+        line: this.#getLineNumber(pageIndex, matchPos),
+        before: normalizeWhitespace(raw.slice(start, rawStart)),
+        match: normalizeWhitespace(raw.slice(rawStart, rawEnd)),
+        after: normalizeWhitespace(raw.slice(rawEnd, end)),
+      });
+    }
+    return results;
+  }
+
+  /**
+   * Map a position, relative to the text items of a page, to the equivalent
+   * position in the raw page content (which contains the end-of-lines).
+   * @param {number} pageIndex
+   * @param {number} pos - The position relative to the text items.
+   * @param {boolean} [isEnd] - Whether `pos` is the *end* of a range.
+   * @returns {number}
+   */
+  #toRawIndex(pageIndex, pos, isEnd = false) {
+    const eolOffsets = this._pageEolOffsets[pageIndex];
+    if (!eolOffsets) {
+      return pos;
+    }
+    let shift = 0;
+    for (const offset of eolOffsets) {
+      if (isEnd ? offset >= pos : offset > pos) {
+        break;
+      }
+      shift++;
+    }
+    return pos + shift;
+  }
+
+  /**
+   * Compute the line, on the page, in which a match was found; based on the
+   * end-of-lines of the extracted text content.
+   * @param {number} pageIndex
+   * @param {number} matchPos - The position of the match, relative to the
+   *   text items of the page.
+   * @returns {number}
+   */
+  #getLineNumber(pageIndex, matchPos) {
+    const eolOffsets = this._pageEolOffsets[pageIndex];
+    if (!eolOffsets) {
+      return 1;
+    }
+    let line = 1;
+    for (const offset of eolOffsets) {
+      if (offset > matchPos) {
+        break;
+      }
+      line++;
+    }
+    return line;
+  }
+
+  /**
+   * Send the (current) matches, with their context, to the viewer such that
+   * they can be rendered in the "find results" sidebar.
+   */
+  #dispatchResults() {
+    const results = [];
+    for (const pageResults of this.#pageResults) {
+      if (!pageResults) {
+        continue;
+      }
+      for (const result of pageResults) {
+        if (results.length >= FIND_RESULTS_LIMIT) {
+          break;
+        }
+        results.push(result);
+      }
+      if (results.length >= FIND_RESULTS_LIMIT) {
+        break;
+      }
+    }
+    this._eventBus.dispatch("updatefindresults", {
+      source: this,
+      query: this.#state?.query ?? "",
+      results,
+    });
+  }
+
   #nextMatch() {
     const previous = this.#state.findPrevious;
     const currentPageIndex = this._linkService.page - 1;
@@ -955,8 +1153,11 @@ class PDFFindController {
       this._resumePageIdx = null;
       this._pageMatches.length = 0;
       this._pageMatchesLength.length = 0;
+      this.#pageResults.length = 0;
       this.#visitedPagesCount = 0;
       this._matchesCountTotal = 0;
+
+      this.#dispatchResults(); // Wipe out the previous results, if any.
 
       this.#updateAllPages(); // Wipe out any previously highlighted matches.
 
@@ -1102,15 +1303,26 @@ class PDFFindController {
     if (type === "copy") {
       const promises = new Map();
       const contents = new Map();
+      const rawContents = new Map();
+      const eolOffsets = new Map();
       const diffs = new Map();
       const diacritics = new Map();
       for (const pageNum of pageNumbers) {
         promises.set(pageNum, this._extractTextPromises[pageNum - 1]);
         contents.set(pageNum, this._pageContents[pageNum - 1]);
+        rawContents.set(pageNum, this._pageRawContents[pageNum - 1]);
+        eolOffsets.set(pageNum, this._pageEolOffsets[pageNum - 1]);
         diffs.set(pageNum, this._pageDiffs[pageNum - 1]);
         diacritics.set(pageNum, this._hasDiacritics[pageNum - 1]);
       }
-      this.#copiedPageData = { promises, contents, diffs, diacritics };
+      this.#copiedPageData = {
+        promises,
+        contents,
+        rawContents,
+        eolOffsets,
+        diffs,
+        diacritics,
+      };
       return;
     }
 
@@ -1123,6 +1335,8 @@ class PDFFindController {
       this.#savedPageData = {
         promises: this._extractTextPromises,
         contents: this._pageContents,
+        rawContents: this._pageRawContents,
+        eolOffsets: this._pageEolOffsets,
         diffs: this._pageDiffs,
         diacritics: this._hasDiacritics,
       };
@@ -1131,6 +1345,8 @@ class PDFFindController {
     if (type === "cancelDelete") {
       this._extractTextPromises = this.#savedPageData.promises;
       this._pageContents = this.#savedPageData.contents;
+      this._pageRawContents = this.#savedPageData.rawContents;
+      this._pageEolOffsets = this.#savedPageData.eolOffsets;
       this._pageDiffs = this.#savedPageData.diffs;
       this._hasDiacritics = this.#savedPageData.diacritics;
       return;
@@ -1152,10 +1368,14 @@ class PDFFindController {
     this._dirtyMatch = true;
     const prevPromises = this._extractTextPromises;
     const prevContents = this._pageContents;
+    const prevRawContents = this._pageRawContents;
+    const prevEolOffsets = this._pageEolOffsets;
     const prevDiffs = this._pageDiffs;
     const prevDiacritics = this._hasDiacritics;
     const extractTextPromises = (this._extractTextPromises = []);
     const pageContents = (this._pageContents = []);
+    const pageRawContents = (this._pageRawContents = []);
+    const pageEolOffsets = (this._pageEolOffsets = []);
     const pageDiffs = (this._pageDiffs = []);
     const hasDiacritics = (this._hasDiacritics = []);
     for (let i = 1, ii = pagesMapper.pagesNumber; i <= ii; i++) {
@@ -1166,6 +1386,8 @@ class PDFFindController {
           this.#copiedPageData?.promises.get(src) || Promise.resolve()
         );
         pageContents.push(this.#copiedPageData?.contents.get(src) ?? "");
+        pageRawContents.push(this.#copiedPageData?.rawContents.get(src) ?? "");
+        pageEolOffsets.push(this.#copiedPageData?.eolOffsets.get(src) ?? []);
         pageDiffs.push(this.#copiedPageData?.diffs.get(src) ?? null);
         hasDiacritics.push(this.#copiedPageData?.diacritics.get(src) ?? false);
         continue;
@@ -1174,6 +1396,8 @@ class PDFFindController {
         prevPromises[prevPageNumber - 1] || Promise.resolve()
       );
       pageContents.push(prevContents[prevPageNumber - 1] ?? "");
+      pageRawContents.push(prevRawContents[prevPageNumber - 1] ?? "");
+      pageEolOffsets.push(prevEolOffsets[prevPageNumber - 1] ?? []);
       pageDiffs.push(prevDiffs[prevPageNumber - 1] ?? null);
       hasDiacritics.push(prevDiacritics[prevPageNumber - 1] ?? false);
     }
@@ -1210,6 +1434,9 @@ class PDFFindController {
       }
       // Avoid the UI being in a pending state when the findbar is re-opened.
       this.#updateUIState(FindState.FOUND);
+
+      this.#pageResults.length = 0;
+      this.#dispatchResults();
 
       this._highlightMatches = false;
       this.#updateAllPages(); // Wipe out any previously highlighted matches.

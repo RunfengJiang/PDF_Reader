@@ -83,6 +83,7 @@ import { PDFCursorTools } from "web-pdf_cursor_tools";
 import { PDFDocumentProperties } from "web-pdf_document_properties";
 import { PDFFindBar } from "web-pdf_find_bar";
 import { PDFFindController } from "./pdf_find_controller.js";
+import { PDFFindResults } from "./pdf_find_results.js";
 import { PDFHistory } from "./pdf_history.js";
 import { PDFLayerViewer } from "web-pdf_layer_viewer";
 import { PDFOutlineViewer } from "web-pdf_outline_viewer";
@@ -771,6 +772,14 @@ const PDFViewerApplication = {
         appConfig.principalContainer,
         eventBus
       );
+
+      if (appConfig.findResults) {
+        this.findResults = new PDFFindResults(
+          appConfig.findResults,
+          eventBus,
+          findController
+        );
+      }
     }
 
     if (appConfig.annotationEditorParams) {
@@ -1374,6 +1383,7 @@ const PDFViewerApplication = {
 
     this.pdfHistory?.reset();
     this.findBar?.reset();
+    this.findResults?.reset();
     this.toolbar?.reset();
     this.secondaryToolbar?.reset();
     this._PDFBug?.cleanup();

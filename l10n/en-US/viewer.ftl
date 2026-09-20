@@ -243,6 +243,26 @@ pdfjs-find-match-count-limit =
 
 pdfjs-find-not-found = Phrase not found
 
+## Find results sidebar
+
+pdfjs-find-results-sidebar-title = Find Results
+pdfjs-find-results-close-button =
+    .title = Close the find results
+pdfjs-find-results-close-button-label = Close
+
+# Variables:
+#   $total (Number) - the total number of matches in the document
+pdfjs-find-results-count =
+    { $total ->
+        [one] { $total } match
+       *[other] { $total } matches
+    }
+
+# Variables:
+#   $page (Number) - the page in which the match was found
+#   $line (Number) - the line, on that page, in which the match was found
+pdfjs-find-result-meta = Page { $page }, line { $line }
+
 ## Predefined zoom values
 
 pdfjs-page-scale-width = Page Width

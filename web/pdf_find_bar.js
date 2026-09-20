@@ -177,6 +177,8 @@ class PDFFindBar {
 
       this.opened = true;
       toggleExpandedBtn(this.toggleButton, true, this.bar);
+
+      this.eventBus.dispatch("findbaropen", { source: this });
     }
     this.findField.select();
     this.findField.focus();

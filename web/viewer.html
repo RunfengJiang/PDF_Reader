@@ -892,6 +892,39 @@ See https://github.com/adobe-type-tools/cmap-resources
       </div>
       <!-- mainContainer -->
 
+      <div
+        id="findResultsSidebar"
+        class="hidden"
+        role="region"
+        aria-labelledby="findResultsSidebarTitle"
+      >
+        <div id="findResultsSidebarHeader">
+          <span
+            id="findResultsSidebarTitle"
+            data-l10n-id="pdfjs-find-results-sidebar-title"
+          ></span>
+          <span id="findResultsSidebarCount"></span>
+          <button
+            id="findResultsSidebarCloseButton"
+            class="toolbarButton findResultsCloseButton"
+            type="button"
+            tabindex="0"
+            data-l10n-id="pdfjs-find-results-close-button"
+          >
+            <span data-l10n-id="pdfjs-find-results-close-button-label"></span>
+          </button>
+        </div>
+        <div id="findResultsSidebarListContainer" tabindex="-1">
+          <div
+            id="findResultsSidebarEmpty"
+            hidden="hidden"
+            data-l10n-id="pdfjs-find-not-found"
+          ></div>
+          <ul id="findResultsSidebarList"></ul>
+        </div>
+      </div>
+      <!-- findResultsSidebar -->
+
       <div id="dialogContainer">
         <dialog id="passwordDialog">
           <div class="row">

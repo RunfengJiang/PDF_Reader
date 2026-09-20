@@ -27,6 +27,7 @@
   --dir-factor: 1;
 
   --sidebar-width: 200px;
+  --find-results-width: 320px;
   --sidebar-transition-duration: 200ms;
   --sidebar-transition-timing-function: ease;
 
@@ -1829,4 +1830,112 @@ dialog :link {
   #scaleSelectContainer {
     display: none;
   }
+}
+
+#findResultsSidebar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: var(--find-results-width);
+  border-inline-start: 1px solid var(--toolbar-border-color);
+  background-color: var(--toolbar-bg-color);
+  color: var(--main-color);
+  font: message-box;
+
+  #findResultsSidebarHeader {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    gap: 8px;
+    width: 100%;
+    padding: 8px;
+    border-block-end: 1px solid var(--toolbar-border-color);
+    font-size: 13px;
+
+    #findResultsSidebarTitle {
+      font-weight: 600;
+    }
+
+    #findResultsSidebarCount {
+      flex: 1;
+      opacity: 0.75;
+    }
+
+    #findResultsSidebarCloseButton {
+      min-width: 0;
+      padding: 2px 6px;
+      border: 1px solid var(--doorhanger-border-color);
+      border-radius: 2px;
+      background-color: transparent;
+      color: var(--main-color);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--button-hover-color);
+      }
+    }
+  }
+
+  #findResultsSidebarListContainer {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  #findResultsSidebarEmpty {
+    padding: 12px;
+    opacity: 0.75;
+  }
+
+  #findResultsSidebarList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .findResult {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-block-end: 1px solid var(--doorhanger-separator-color);
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--button-hover-color);
+    }
+
+    &.selected {
+      background-color: var(--toggled-btn-bg-color);
+    }
+
+    .findResultMeta {
+      margin-block-end: 4px;
+      font-weight: 600;
+      opacity: 0.75;
+    }
+
+    .findResultText {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .findResultMatch {
+      border-radius: 2px;
+      background-color: rgb(255 255 0 / 0.35);
+      font-weight: 600;
+    }
+
+    @media screen and (forced-colors: active) {
+      .findResultMatch {
+        background-color: Highlight;
+        color: HighlightText;
+      }
+    }
+  }
+}
+
+#outerContainer.findResultsOpen #mainContainer {
+  inset-inline-end: var(--find-results-width);
 }

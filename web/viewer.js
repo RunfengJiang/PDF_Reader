@@ -209,6 +209,14 @@ function getViewerConfiguration() {
       findPreviousButton: document.getElementById("findPreviousButton"),
       findNextButton: document.getElementById("findNextButton"),
     },
+    findResults: {
+      container: document.getElementById("findResultsSidebar"),
+      outerContainer: document.getElementById("outerContainer"),
+      list: document.getElementById("findResultsSidebarList"),
+      count: document.getElementById("findResultsSidebarCount"),
+      closeButton: document.getElementById("findResultsSidebarCloseButton"),
+      emptyMessage: document.getElementById("findResultsSidebarEmpty"),
+    },
     passwordOverlay: {
       dialog: document.getElementById("passwordDialog"),
       label: document.getElementById("passwordText"),
