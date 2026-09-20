@@ -1,11 +1,9 @@
 // Copies the built pdf.js viewer (`build/generic`) into `electron/viewer`,
 // so that both `npm start` and the packaged app load the very same files.
 import { cpSync, existsSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const electronDir = join(here, "..");
+const electronDir = join(import.meta.dirname, "..");
 const src = join(electronDir, "..", "build", "generic");
 const dest = join(electronDir, "viewer");
 

@@ -18,7 +18,8 @@
     "copyright": "Copyright © 2026",
     "files": [
       "main.js",
-      "package.json"
+      "package.json",
+      "shell/**"
     ],
     "extraResources": [
       {

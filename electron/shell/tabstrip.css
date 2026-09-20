@@ -1,0 +1,97 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background-color: #2f3338;
+  color: #f9f9fa;
+  font:
+    12px/1.4 "Segoe UI",
+    system-ui,
+    sans-serif;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 4px 0;
+}
+
+#tabList {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  min-width: 90px;
+  padding: 0 6px 0 10px;
+  border-radius: 4px 4px 0 0;
+  background-color: #3c4043;
+  color: #d7d7db;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background-color: #464a4e;
+}
+
+.tab.active {
+  background-color: #52565b;
+  color: #f9f9fa;
+}
+
+.tabLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabClose {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tabClose:hover {
+  background-color: rgb(255 255 255 / 0.15);
+}
+
+#newTabButton {
+  flex: none;
+  width: 30px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  background-color: #3c4043;
+  color: #d7d7db;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#newTabButton:hover {
+  background-color: #464a4e;
+}
