@@ -1,0 +1,62 @@
+{
+  "name": "pdf-reader",
+  "version": "1.0.0",
+  "description": "Windows desktop PDF reader based on Mozilla pdf.js",
+  "main": "main.js",
+  "author": "bruce.jiang",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "sync": "node scripts/sync-viewer.mjs",
+    "start": "npm run sync && electron .",
+    "pack": "npm run sync && electron-builder --win --dir",
+    "dist": "npm run sync && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.local.pdfreader",
+    "productName": "PDF Reader",
+    "copyright": "Copyright © 2026",
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "viewer",
+        "to": "viewer"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "PDF Document",
+          "description": "PDF Document",
+          "role": "Viewer"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PDF Reader"
+    },
+    "portable": {
+      "artifactName": "PDF-Reader-${version}-portable.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}
