@@ -34,6 +34,7 @@ export default [
       "**/l10n/",
       "**/docs/",
       "**/node_modules/",
+      "**/package-lock.json",
       "external/bcmaps/",
       "external/brotli/",
       "external/builder/fixtures/",
@@ -47,6 +48,8 @@ export default [
       "test/pdfs/",
       "web/locale/",
       "web/wasm/",
+      "electron/viewer/",
+      "electron/dist/",
       "**/*~/",
       ".{claude,codex,cursor}/",
     ],
@@ -584,5 +587,22 @@ export default [
   {
     files: ["gulpfile.mjs"],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ["electron/*.js", "electron/shell/*.js"],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: "commonjs",
+    },
+    rules: {
+      "no-var": "off",
+    },
+  },
+  {
+    files: ["electron/scripts/*.mjs"],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: "module",
+    },
   },
 ];
